@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { v4 as uuidv4 } from 'uuid';
 import { AgentProfile, Message, Session } from '../models';
+import { ConsensusService } from './consensusService';
 import * as dotenv from 'dotenv';
 
 // Load environment variables
@@ -9,6 +10,7 @@ dotenv.config();
 export class AgentService {
   private anthropic: Anthropic;
   private defaultProfiles: AgentProfile[];
+  private consensusService: ConsensusService;
 
   constructor() {
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -19,6 +21,8 @@ export class AgentService {
     this.anthropic = new Anthropic({
       apiKey: apiKey
     });
+
+    this.consensusService = new ConsensusService();
 
     this.defaultProfiles = [
       {
@@ -136,12 +140,14 @@ export class AgentService {
     agent: AgentProfile,
     session: Session,
     recentMessages: Message[]
-  ): Promise<string> {
-    const context = this.buildContext(agent, session, recentMessages);
+  ): Promise<{ content: string; consensus?: any }> {
+    const context = session.type === 'consensus' && session.consensus
+      ? this.consensusService.generateConsensusPrompt(session, session.consensus, agent.id, recentMessages)
+      : this.buildContext(agent, session, recentMessages);
 
     try {
       const response = await this.anthropic.messages.create({
-        model: 'claude-3-sonnet-20240229',
+        model: agent.model,
         max_tokens: 1000,
         messages: [
           {
@@ -151,10 +157,19 @@ export class AgentService {
         ]
       });
 
-      return response.content[0].type === 'text' ? response.content[0].text : 'I apologize, but I cannot generate a response at this time.';
+      const content = response.content[0].type === 'text' ? response.content[0].text : 'I apologize, but I cannot generate a response at this time.';
+      
+      // Parse consensus signals if this is a consensus session
+      const consensusData = session.type === 'consensus' 
+        ? this.consensusService.parseConsensusSignal(content)
+        : undefined;
+
+      return { content, consensus: consensusData };
     } catch (error) {
       console.error('Error generating agent response:', error);
-      return `${agent.name}: I'm experiencing technical difficulties and cannot respond right now.`;
+      return { 
+        content: `${agent.name}: I'm experiencing technical difficulties and cannot respond right now.`
+      };
     }
   }
 

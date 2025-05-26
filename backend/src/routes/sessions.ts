@@ -7,13 +7,17 @@ export function sessionRoutes(sessionService: SessionService) {
 
   router.post('/', (req, res) => {
     try {
-      const { title, goal, participants } = req.body;
+      const { title, goal, participants, type = 'discussion', consensusQuestion } = req.body;
       
       if (!title || !goal || !participants || !Array.isArray(participants)) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      const session = sessionService.createSession(title, goal, participants);
+      if (type === 'consensus' && !consensusQuestion) {
+        return res.status(400).json({ error: 'Consensus question is required for consensus sessions' });
+      }
+
+      const session = sessionService.createSession(title, goal, participants, type, consensusQuestion);
       res.json(session);
     } catch (error) {
       res.status(500).json({ error: 'Failed to create session' });

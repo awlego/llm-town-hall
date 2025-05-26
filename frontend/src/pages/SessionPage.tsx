@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { AgentCards } from '../components/AgentCards';
 import { ModeratorPanel } from '../components/ModeratorPanel';
+import { ConsensusPanel } from '../components/ConsensusPanel';
 import { getAgentColor } from '../utils/colors';
 
 export const SessionPage: React.FC = () => {
@@ -116,6 +117,9 @@ export const SessionPage: React.FC = () => {
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-6 space-y-6">
               <AgentCards agents={currentSession.participants} thinking={thinking} />
+              {currentSession.type === 'consensus' && (
+                <ConsensusPanel session={currentSession} />
+              )}
               <ModeratorPanel
                 session={currentSession}
                 onModeratorInput={handleModeratorInput}

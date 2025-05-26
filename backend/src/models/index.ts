@@ -19,11 +19,42 @@ export interface Session {
   participants: AgentProfile[];
   messages: Message[];
   status: 'active' | 'paused' | 'completed';
+  type: 'discussion' | 'consensus';
+  consensus?: ConsensusState;
   metadata: {
     createdAt: Date;
     lastActive: Date;
     totalMessages: number;
   };
+}
+
+export interface ConsensusState {
+  question: string;
+  currentRound: number;
+  maxRounds: number;
+  agentStates: Record<string, AgentConsensusState>;
+  positions: ConsensusPosition[];
+  finalDecision?: string;
+  consensusReached: boolean;
+}
+
+export interface AgentConsensusState {
+  agentId: string;
+  currentPosition: string;
+  confidence: number; // 1-10 scale
+  hasMoreToSay: boolean;
+  roundsActive: number;
+  lastActive: number;
+  messagesThisRound: number;
+}
+
+export interface ConsensusPosition {
+  id: string;
+  title: string;
+  description: string;
+  supporters: string[]; // agent IDs
+  createdBy: string;
+  createdAt: Date;
 }
 
 export interface Message {
@@ -33,6 +64,11 @@ export interface Message {
   content: string;
   timestamp: Date;
   type: 'agent' | 'moderator' | 'system';
+  consensus?: {
+    signal: 'has_more' | 'satisfied' | 'position_change';
+    position?: string;
+    confidence?: number;
+  };
   metadata: {
     tokensUsed: number;
     responseTime: number;

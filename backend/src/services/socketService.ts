@@ -79,9 +79,10 @@ export class SocketService {
         id: uuidv4(),
         sessionId,
         agentId,
-        content: response,
+        content: response.content,
         timestamp: new Date(),
         type: 'agent',
+        consensus: response.consensus,
         metadata: {
           tokensUsed: 0,
           responseTime: 0
@@ -89,21 +90,71 @@ export class SocketService {
       };
 
       this.sessionService.addMessage(sessionId, message);
+      
+      // Handle consensus-specific logic
+      if (session.type === 'consensus' && session.consensus) {
+        this.sessionService.updateConsensusState(sessionId, message);
+        
+        // Check if consensus reached
+        if (session.consensus.consensusReached) {
+          this.io.to(sessionId).emit('consensus_reached', {
+            decision: session.consensus.finalDecision,
+            round: session.consensus.currentRound
+          });
+          this.io.to(sessionId).emit('agent_message', message);
+          this.activeGenerations.delete(sessionId);
+          return;
+        }
+        
+        // Check if we should advance to next round
+        if (this.sessionService.shouldAdvanceConsensusRound(sessionId)) {
+          this.sessionService.advanceConsensusRound(sessionId);
+          this.io.to(sessionId).emit('consensus_round_advance', {
+            round: session.consensus.currentRound
+          });
+        }
+      }
+
       this.io.to(sessionId).emit('agent_message', message);
 
       // Remove from active generations
       this.activeGenerations.delete(sessionId);
 
-      // Schedule next agent response with longer delay
+      // Schedule next agent response
       setTimeout(() => {
         const updatedSession = this.sessionService.getSession(sessionId);
         if (updatedSession && updatedSession.status === 'active') {
-          const nextAgent = this.agentService.getNextAgent(updatedSession, agentId);
-          if (nextAgent) {
-            this.generateAgentResponse(sessionId, nextAgent.id);
+          let nextAgentId: string | null = null;
+          
+          if (updatedSession.type === 'consensus' && updatedSession.consensus) {
+            // Check if consensus has been reached
+            const consensusResult = this.sessionService.checkConsensusReached(sessionId);
+            if (consensusResult.reached) {
+              // End consensus building and output final decision
+              this.sessionService.finalizeConsensus(sessionId, consensusResult.decision || 'No clear consensus reached');
+              this.io.to(sessionId).emit('consensus_reached', {
+                decision: consensusResult.decision,
+                finalRound: updatedSession.consensus.currentRound
+              });
+            } else {
+              nextAgentId = this.sessionService.getNextConsensusAgent(sessionId);
+              
+              // Check if we need to advance round
+              if (!nextAgentId && this.sessionService.shouldAdvanceConsensusRound(sessionId)) {
+                this.sessionService.advanceConsensusRound(sessionId);
+                nextAgentId = this.sessionService.getNextConsensusAgent(sessionId);
+              }
+            }
+          } else {
+            const nextAgent = this.agentService.getNextAgent(updatedSession, agentId);
+            nextAgentId = nextAgent ? nextAgent.id : null;
+          }
+          
+          if (nextAgentId) {
+            this.generateAgentResponse(sessionId, nextAgentId);
           }
         }
-      }, 3000); // Increased delay to 3 seconds
+      }, 3000);
 
     } catch (error) {
       console.error('Error generating agent response:', error);

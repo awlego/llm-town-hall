@@ -42,6 +42,40 @@ export const useSocket = (serverUrl: string) => {
       }
     });
 
+    socketRef.current.on('consensus_reached', ({ decision, round }: any) => {
+      // Handle consensus reached
+      setCurrentSession(prev => {
+        if (prev && prev.consensus) {
+          return {
+            ...prev,
+            status: 'completed',
+            consensus: {
+              ...prev.consensus,
+              consensusReached: true,
+              finalDecision: decision
+            }
+          };
+        }
+        return prev;
+      });
+    });
+
+    socketRef.current.on('consensus_round_advance', ({ round }: any) => {
+      // Handle round advancement
+      setCurrentSession(prev => {
+        if (prev && prev.consensus) {
+          return {
+            ...prev,
+            consensus: {
+              ...prev.consensus,
+              currentRound: round
+            }
+          };
+        }
+        return prev;
+      });
+    });
+
     return () => {
       socketRef.current?.disconnect();
     };
