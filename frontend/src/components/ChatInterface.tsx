@@ -14,7 +14,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, agents, 
   const [isAtBottom, setIsAtBottom] = useState(true);
   const prevMessagesLength = useRef(messages.length);
   const prevThinking = useRef(thinking);
-  const prevScrollState = useRef({ isAtBottom: true, scrollTop: 0, scrollHeight: 0 });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,26 +32,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, agents, 
     setIsAtBottom(checkIfAtBottom());
   };
 
-  // Temporary debug logging - only on changes
-  const currentScrollTop = containerRef.current?.scrollTop || 0;
-  const currentScrollHeight = containerRef.current?.scrollHeight || 0;
-  if (isAtBottom !== prevScrollState.current.isAtBottom || 
-      currentScrollTop !== prevScrollState.current.scrollTop ||
-      currentScrollHeight !== prevScrollState.current.scrollHeight) {
-    console.log('Scroll Debug:', {
-      messageCount: messages.length,
-      isAtBottom,
-      scrollTop: currentScrollTop,
-      scrollHeight: currentScrollHeight,
-      clientHeight: containerRef.current?.clientHeight,
-      hasOverflow: currentScrollHeight > (containerRef.current?.clientHeight || 0),
-      containerHeight: containerRef.current?.offsetHeight,
-      containerStyle: containerRef.current ? window.getComputedStyle(containerRef.current).height : 'unknown',
-      distanceFromBottom: containerRef.current ? 
-        containerRef.current.scrollHeight - containerRef.current.scrollTop - containerRef.current.clientHeight : 0
-    });
-    prevScrollState.current = { isAtBottom, scrollTop: currentScrollTop, scrollHeight: currentScrollHeight };
-  }
 
   useEffect(() => {
     // Only auto-scroll if user is at the bottom AND something actually changed
